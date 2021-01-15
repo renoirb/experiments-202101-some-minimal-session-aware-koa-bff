@@ -1,0 +1,29 @@
+{
+  "name": "experiments-202101-some-minimal-session-aware-koa-bff",
+  "version": "0.0.1",
+  "description": "Some minimal session aware minimal BFF using Koa",
+  "license": "MIT",
+  "author": {
+    "name": "Renoir Boulanger",
+    "email": "contribs@renoirboulanger.com"
+  },
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "fix": "use-cross-env use-prettier --write '**/*.{ts,json,md,mjs,js}'",
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@renoirb/koa-middleware-utils": "^0.1.3",
+    "koa": "^2.13.1",
+    "koa-body": "^4.2.0",
+    "koa-session": "^6.1.0"
+  },
+  "devDependencies": {
+    "@renoirb/conventions-use-prettier": "^1.3.0",
+    "@renoirb/tools-bundling-helpers": "^1.2.1"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
