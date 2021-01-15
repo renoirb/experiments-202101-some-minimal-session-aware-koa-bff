@@ -10,9 +10,6 @@ import {
 const AS_IF_WE_VALIDATED = '111.222.333'
 const SESSION_KEY = 'bff'
 
-const FALLBACK_LOCALE = 'en-US'
-const FALLBACK_TZ = 'America/New_York'
-
 /** @type {import('@renoirb/koa-middleware-utils').IHasSessionCookieMiddlewareOptions} */
 const CONFIG_HAS_SESSION = {
   cookieName: SESSION_KEY,
@@ -55,58 +52,22 @@ app.use((ctx, next) => {
   console.log(`END\t${ctx.method} ${ctx.url}`)
 })
 
-// Session state
-app.use((ctx, next) => {
-  console.log(`BEGIN\t${ctx.method} ${ctx.url}\tSession state`)
-  let authenticated = false
-  let jwt = ''
-  const subject = { displayName: 'Anonymous' }
-  let sessionState = createSessionState(authenticated, subject)
-  sessionState.jwt = jwt
-  sessionState.locale = FALLBACK_LOCALE
-  sessionState.tz = FALLBACK_TZ
-  ctx.state.sessionState = sessionState
-  console.log(
-    `BEFORE Session state\n`,
-    JSON.parse(JSON.stringify(sessionState)),
-  )
-  next()
-  console.log(
-    `AFTER Session state\n`,
-    JSON.parse(JSON.stringify(ctx.state.sessionState)),
-  )
-  console.log(`END\t${ctx.method} ${ctx.url}\tSession state`)
-})
 
 app.use((ctx, next) => {
-  let routeName = ''
-  let n = ctx.session.views || 0
-  ctx.session.views = ++n
-
-  console.log(`BEGIN\t${ctx.method} ${ctx.url}\tController-ish`, {
-    views: n,
-    'ctx.state': JSON.parse(JSON.stringify(ctx.state)),
-    'ctx.session': JSON.parse(JSON.stringify(ctx.session)),
-  })
-
-  // Route for creating cookie
+  let sessionState = { jwt: '' }
+  if (ctx.state.sessionState) {
+    sessionState = JSON.parse(JSON.stringify({ jwt: '', ...ctx.state.sessionState }))
+  }
   if (
     ctx.path ===
     `${CONFIG_SESSION_RECOVERY.baseApi}${CONFIG_SESSION_RECOVERY.recoveryPath}`
   ) {
-    routeName = 'recovery'
     if (ctx.method === 'POST') {
-      const authenticated = true
-      let sessionState = ctx.state.sessionState
       if (AS_IF_WE_VALIDATED === ctx.request.body.jwt) {
-        let subject = JSON.parse(JSON.stringify(sessionState.subject))
         // This should come from a source of validation, and source of truth
         // Adding to the state the jwt, but we could also keep other preferences
-        subject.displayName = 'Mr. Nobody'
-        const sessionStateNew = createSessionState(authenticated, subject)
+        const sessionStateNew = { jwt: '', ...sessionState }
         sessionStateNew.jwt = ctx.request.body.jwt
-        sessionStateNew.locale = 'fr-CA'
-        sessionStateNew.tz = 'America/Montreal'
         sessionState = sessionStateNew
       }
       // Persisting to the session (i.e. creating cookie) as per how koa-session is configured.
@@ -117,7 +78,7 @@ app.use((ctx, next) => {
   }
   // ------ END Things that would be in koa routes -----
 
-  let sessionState = JSON.parse(JSON.stringify(ctx.state.sessionState))
+  let newSessionState = JSON.parse(JSON.stringify(sessionState))
 
   // ------ BEGIN Sharing session state ------
 
@@ -168,8 +129,8 @@ app.use((ctx, next) => {
   )
 
   // Use one of the three methods
-  const fallback = JSON.parse(JSON.stringify(sessionState))
-  sessionState =
+  const fallback = JSON.parse(JSON.stringify(newSessionState))
+  newSessionState =
     sessionStateMethod1 ||
     sessionStateMethod2 ||
     sessionStateMethod3 ||
@@ -179,27 +140,21 @@ app.use((ctx, next) => {
   // sessionState = sessionStateMethod3
 
   // Ensure the ctx.state (koa internal state for cross-middleware state) is the same as ctx.session (cookie)
-  ctx.state.sessionState = JSON.parse(JSON.stringify(sessionState))
+  ctx.state.sessionState = JSON.parse(JSON.stringify(newSessionState))
 
   // ------ END Sharing session state ------
 
   next()
 
-  // ------ BEGIN Things that would be in koa routes -----
-  // Route for current session data
   if (ctx.path === `${CONFIG_SESSION_RECOVERY.baseApi}/whois`) {
-    ctx.body = ctx.state.sessionState
+    ctx.body = ( ctx.state.sessionState || {} )
     // Nothing else to do, we stop here — no next!
     return
   }
 
   console.log(`END\t${ctx.method} ${ctx.url}\tController-ish`, {
-    routeName,
     'ctx.request.body': JSON.parse(JSON.stringify(ctx.request.body)),
-    'ctx.path': ctx.path,
-    'ctx.state': JSON.parse(JSON.stringify(ctx.state)),
-    'ctx.session': JSON.parse(JSON.stringify(ctx.session)),
-    hasSessionCookie: ctx.state.hasSessionCookie,
+    hasSessionCookie: ( ctx.state.hasSessionCookie || null),
     sessionState,
     sessionState2,
     sessionState3,
