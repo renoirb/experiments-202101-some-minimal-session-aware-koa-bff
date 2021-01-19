@@ -2,6 +2,7 @@ import Koa from 'koa'
 import koaBody from 'koa-body'
 import session from 'koa-session'
 import koaHttProxy from 'koa-better-http-proxy'
+import URL from 'url'
 import {
   hasSessionCookieMiddleware,
   recoveryFormMiddleware,
@@ -76,7 +77,12 @@ if (APP_DATA_SOURCE_ORIGIN_PROXY) {
   app.use(
     koaHttProxy(APP_DATA_SOURCE_ORIGIN_PROXY, {
       timeout: 2000,
-      strippedHeaders: ['set-cookie', 'location'],
+      strippedHeaders: ['set-cookie', 'location', 'cookie', 'referer'],
+      proxyReqPathResolver(ctx) {
+        const urlObj = URL.parse(APP_DATA_SOURCE_ORIGIN_PROXY)
+        const { path = '/' } = urlObj
+        return path
+      },
       filter(ctx) {
         // Contrived example of only one, normally we would have more thn one
         const proxyAlpha = ctx.path.startsWith(proxyAlphaUrl)
@@ -102,13 +108,12 @@ if (APP_DATA_SOURCE_ORIGIN_PROXY) {
         if (authorizationToken) {
           proxyReqOpts.headers['Authorization'] = `Bearer ${authorizationToken}`
         }
-        const headers = {
-          ...proxyReqOpts.headers,
+        if ('cookie' in proxyReqOpts.headers) {
+          delete proxyReqOpts.headers.cookie
         }
-        log('koaHttpProxy proxyReqOptDecorator', {
-          headers,
-          authorizationToken,
-        })
+        if ('referer' in proxyReqOpts.headers) {
+          delete proxyReqOpts.headers.referer
+        }
         return proxyReqOpts
       },
     }),
@@ -198,11 +203,11 @@ app.use((ctx, next) => {
   }
   log(
     `END\t${ctx.method} ${ctx.url}\tController-ish Sharing session state methods`,
-    {
-      sessionStateMethod1,
-      sessionStateMethod2,
-      sessionStateMethod3,
-    },
+    // {
+    //   sessionStateMethod1,
+    //   sessionStateMethod2,
+    //   sessionStateMethod3,
+    // },
   )
   // Use one of the three methods
   const fallback = JSON.parse(JSON.stringify(newSessionState))
@@ -239,11 +244,11 @@ app.use((ctx, next) => {
     ctx.body = body
   }
 
-  log(`END\t${ctx.method} ${ctx.url}\tController-ish`, {
-    'ctx.request.body': JSON.parse(JSON.stringify(ctx.request.body)),
-    hasSessionCookie: ctx.state.hasSessionCookie || null,
-    sessionState: newSessionState,
-  })
+  // log(`END\t${ctx.method} ${ctx.url}\tController-ish`, {
+  //   'ctx.request.body': JSON.parse(JSON.stringify(ctx.request.body)),
+  //   hasSessionCookie: ctx.state.hasSessionCookie || null,
+  //   sessionState: newSessionState,
+  // })
 })
 
 app.use(hasSessionCookieMiddleware(CONFIG_HAS_SESSION))
